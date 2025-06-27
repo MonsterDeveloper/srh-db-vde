@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, Users, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns, Trash2 } from "lucide-react";
+import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, Users, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns, Trash2, Plus } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -39,6 +39,9 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+import { Link, useLoaderData } from "react-router";
+import { eq } from "drizzle-orm";
+import { applications, persons, companies, plants, addresses } from "~/database/schema";
 
 import type { Route } from "./+types/home";
 
@@ -46,6 +49,43 @@ export function meta() {
   return [
     { title: "SRH DB VDE - Dashboard" },
   ];
+}
+
+// Loader function to fetch data from the database
+export async function loader({ context }: Route.LoaderArgs) {
+  const { database } = context;
+  
+  // Fetch applications with related data
+  const applicationsData = await database
+    .select({
+      id: applications.id,
+      systemType: applications.systemType,
+      status: applications.status,
+      submissionDate: applications.submissionDate,
+      place: applications.place,
+      subscriberFirstName: persons.firstName,
+      subscriberLastName: persons.lastName,
+      installerName: companies.name,
+      plantAddress: addresses.city,
+    })
+    .from(applications)
+    .leftJoin(persons, eq(applications.subscriberId, persons.id))
+    .leftJoin(companies, eq(applications.installerId, companies.id))
+    .leftJoin(plants, eq(applications.plantId, plants.id))
+    .leftJoin(addresses, eq(plants.addressId, addresses.id))
+    .orderBy(applications.submissionDate);
+
+  return {
+    applications: applicationsData.map(app => ({
+      id: app.id.toString(),
+      systemType: app.systemType as "new_construction" | "extension" | "dismantling",
+      status: app.status as "draft" | "pending" | "under_review" | "approved" | "rejected" | "completed",
+      submissionDate: new Date(app.submissionDate),
+      place: app.place || app.plantAddress || "N/A",
+      subscriber: `${app.subscriberFirstName || ""} ${app.subscriberLastName || ""}`.trim() || "N/A",
+      installer: app.installerName || "N/A",
+    }))
+  };
 }
 
 // Define the application type
@@ -59,73 +99,15 @@ type Application = {
   installer: string;
 };
 
-// Sample data based on the schema
-const sampleApplications: Application[] = [
-  {
-    id: "app-001",
-    systemType: "new_construction" as const,
-    status: "approved" as const,
-    submissionDate: new Date("2024-01-15"),
-    place: "Munich",
-    subscriber: "Max Mustermann",
-    installer: "Solar Tech GmbH",
-  },
-  {
-    id: "app-002",
-    systemType: "extension" as const,
-    status: "pending" as const,
-    submissionDate: new Date("2024-01-20"),
-    place: "Berlin",
-    subscriber: "Anna Schmidt",
-    installer: "Green Energy Solutions",
-  },
-  {
-    id: "app-003",
-    systemType: "dismantling" as const,
-    status: "under_review" as const,
-    submissionDate: new Date("2024-01-18"),
-    place: "Hamburg",
-    subscriber: "Thomas Weber",
-    installer: "Eco Systems Ltd",
-  },
-  {
-    id: "app-004",
-    systemType: "new_construction" as const,
-    status: "approved" as const,
-    submissionDate: new Date("2024-01-10"),
-    place: "Frankfurt",
-    subscriber: "Lisa Mueller",
-    installer: "Solar Tech GmbH",
-  },
-  {
-    id: "app-005",
-    systemType: "extension" as const,
-    status: "rejected" as const,
-    submissionDate: new Date("2024-01-12"),
-    place: "Dresden",
-    subscriber: "Michael Brown",
-    installer: "Power Solutions Inc",
-  },
-  {
-    id: "app-006",
-    systemType: "new_construction" as const,
-    status: "completed" as const,
-    submissionDate: new Date("2024-01-05"),
-    place: "Cologne",
-    subscriber: "Sarah Johnson",
-    installer: "Green Energy Solutions",
-  },
-];
-
-function SectionCards() {
-  const totalApplications = sampleApplications.length;
-  const pendingReviews = sampleApplications.filter(app => 
+function SectionCards({ applications }: { applications: Application[] }) {
+  const totalApplications = applications.length;
+  const pendingReviews = applications.filter(app => 
     app.status === "pending" || app.status === "under_review"
   ).length;
-  const approvedThisMonth = sampleApplications.filter(app => 
+  const approvedThisMonth = applications.filter(app => 
     app.status === "approved" && app.submissionDate.getMonth() === new Date().getMonth()
   ).length;
-  const completedApplications = sampleApplications.filter(app => 
+  const completedApplications = applications.filter(app => 
     app.status === "completed"
   ).length;
 
@@ -411,6 +393,11 @@ function DataTable({ data }: { data: Application[] }) {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="default" size="sm" className="h-10" asChild>
+            <Link to="/new" prefetch="intent">
+            <Plus className="h-4 w-4" />
+            New Application</Link>
+          </Button>
         </div>
       </div>
       <div className="rounded-md border">
@@ -534,20 +521,22 @@ function DataTable({ data }: { data: Application[] }) {
 }
 
 export default function Home() {
+  const { applications } = useLoaderData<typeof loader>();
+
   return (
     <div className="flex-1 space-y-6 p-4 lg:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
       </div>
       
-      <SectionCards />
+      <SectionCards applications={applications} />
       
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold tracking-tight">VDE Applications</h2>
         </div>
         
-        <DataTable data={sampleApplications} />
+        <DataTable data={applications} />
       </div>
     </div>
   );
