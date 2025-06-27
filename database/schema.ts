@@ -2,7 +2,7 @@ import { integer, sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqli
 import { relations } from "drizzle-orm";
 
 export const addresses = sqliteTable("addresses", {
-  id: text().primaryKey().$default(() => crypto.randomUUID()),
+  id: integer().primaryKey({ autoIncrement: true }),
   street: text().notNull(),
   houseNumber: text("house_number").notNull(),
   postcode: text().notNull(),
@@ -15,21 +15,21 @@ export const addresses = sqliteTable("addresses", {
 ]);
 
 export const persons = sqliteTable("persons", {
-  id: text().primaryKey().$default(() => crypto.randomUUID()),
+  id: integer().primaryKey({ autoIncrement: true }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   phone: text(),
   email: text(),
-  addressId: text("address_id").notNull().references(() => addresses.id),
+  addressId: integer("address_id").notNull().references(() => addresses.id),
   createdAt: integer("created_at", { mode: "timestamp" }).$default(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$default(() => new Date()),
 });
 
 export const companies = sqliteTable("companies", {
-  id: text().primaryKey().$default(() => crypto.randomUUID()),
+  id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   registrationNumber: text("registration_number"),
-  addressId: text("address_id").references(() => addresses.id),
+  addressId: integer("address_id").references(() => addresses.id),
   phone: text(),
   email: text(),
   createdAt: integer("created_at", { mode: "timestamp" }).$default(() => new Date()),
@@ -40,9 +40,9 @@ export const companies = sqliteTable("companies", {
 ]);
 
 export const plants = sqliteTable("plants", {
-  id: text().primaryKey().$default(() => crypto.randomUUID()),
-  addressId: text("address_id").notNull().references(() => addresses.id),
-  contactPersonId: text("contact_person_id").references(() => persons.id),
+  id: integer().primaryKey({ autoIncrement: true }),
+  addressId: integer("address_id").notNull().references(() => addresses.id),
+  contactPersonId: integer("contact_person_id").references(() => persons.id),
   plannedCommissioningDate: integer("planned_commissioning_date", { mode: "timestamp" }),
   actualCommissioningDate: integer("actual_commissioning_date", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$default(() => new Date()),
@@ -50,15 +50,15 @@ export const plants = sqliteTable("plants", {
 });
 
 export const applications = sqliteTable("applications", {
-  id: text().primaryKey().$default(() => crypto.randomUUID()),
+  id: integer().primaryKey({ autoIncrement: true }),
   // Using text with type constraint for enum-like behavior
   systemType: text("system_type", { 
     enum: ["new_construction", "extension", "dismantling"] 
   }).notNull(),
-  plantId: text("plant_id").notNull().references(() => plants.id),
-  subscriberId: text("subscriber_id").notNull().references(() => persons.id),
-  operatorId: text("operator_id").references(() => persons.id),
-  installerId: text("installer_id").references(() => companies.id),
+  plantId: integer("plant_id").notNull().references(() => plants.id),
+  subscriberId: integer("subscriber_id").notNull().references(() => persons.id),
+  operatorId: integer("operator_id").references(() => persons.id),
+  installerId: integer("installer_id").references(() => companies.id),
   // Using text with type constraint for enum-like behavior
   status: text({ 
     enum: ["draft", "pending", "under_review", "approved", "rejected", "completed"] 
