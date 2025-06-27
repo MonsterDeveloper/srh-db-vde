@@ -1,6 +1,13 @@
-import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, Users } from "lucide-react";
+import { TrendingUp, TrendingDown, FileText, Clock, CheckCircle, Users, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns, Trash2 } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import {
   Card,
   CardContent,
@@ -17,6 +24,21 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import * as React from "react";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+  type VisibilityState,
+} from "@tanstack/react-table";
 
 import type { Route } from "./+types/home";
 
@@ -26,8 +48,19 @@ export function meta() {
   ];
 }
 
+// Define the application type
+type Application = {
+  id: string;
+  systemType: "new_construction" | "extension" | "dismantling";
+  status: "draft" | "pending" | "under_review" | "approved" | "rejected" | "completed";
+  submissionDate: Date;
+  place: string;
+  subscriber: string;
+  installer: string;
+};
+
 // Sample data based on the schema
-const sampleApplications = [
+const sampleApplications: Application[] = [
   {
     id: "app-001",
     systemType: "new_construction" as const,
@@ -180,6 +213,326 @@ function getSystemTypeLabel(type: string) {
   return typeLabels[type as keyof typeof typeLabels] || type;
 }
 
+// Define columns for the data table
+const columns: ColumnDef<Application>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "id",
+    header: "ID",
+    cell: ({ row }) => (
+      <div className="font-medium">{row.getValue("id")}</div>
+    ),
+    enableHiding: false,
+  },
+  {
+    accessorKey: "systemType",
+    header: "System Type",
+    cell: ({ row }) => (
+      <div className="w-32">
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          {getSystemTypeLabel(row.getValue("systemType"))}
+        </Badge>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => getStatusBadge(row.getValue("status")),
+  },
+  {
+    accessorKey: "submissionDate",
+    header: "Submission Date",
+    cell: ({ row }) => {
+      const date = row.getValue("submissionDate") as Date;
+      return <div>{date.toLocaleDateString()}</div>;
+    },
+  },
+  {
+    accessorKey: "subscriber",
+    header: "Subscriber",
+    cell: ({ row }) => <div>{row.getValue("subscriber")}</div>,
+  },
+  {
+    accessorKey: "place",
+    header: "Place",
+    cell: ({ row }) => <div>{row.getValue("place")}</div>,
+  },
+  {
+    accessorKey: "installer",
+    header: "Installer",
+    cell: ({ row }) => <div>{row.getValue("installer")}</div>,
+  },
+  {
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => {
+      const application = row.original;
+      
+      return (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Handle delete action
+              console.log("Delete application:", application.id);
+            }}
+            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    },
+  },
+];
+
+function DataTable({ data }: { data: Application[] }) {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  const table = useReactTable({
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      pagination,
+    },
+  });
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between py-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Filter applications..."
+            value={(table.getColumn("id")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("id")?.setFilterValue(event.target.value)
+            }
+            className="flex h-10 w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select
+              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none pr-8"
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "all") {
+                  table.getColumn("status")?.setFilterValue(undefined);
+                } else {
+                  table.getColumn("status")?.setFilterValue(value);
+                }
+              }}
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="completed">Completed</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10"
+              >
+                <Columns className="h-4 w-4" />
+                Columns
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium">Rows per page</p>
+                         <select
+               className="flex h-8 w-16 items-center justify-between rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+               value={table.getState().pagination.pageSize}
+               onChange={(e) => {
+                 table.setPageSize(Number(e.target.value));
+               }}
+             >
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex w-24 items-center justify-center text-sm font-medium">
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              className="hidden h-8 w-8 p-0 lg:flex"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Go to first page</span>
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Go to previous page</span>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Go to next page</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="hidden h-8 w-8 p-0 lg:flex"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Go to last page</span>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <div className="flex-1 space-y-6 p-4 lg:p-6">
@@ -194,50 +547,7 @@ export default function Home() {
           <h2 className="text-2xl font-bold tracking-tight">VDE Applications</h2>
         </div>
         
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>System Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submission Date</TableHead>
-                  <TableHead>Subscriber</TableHead>
-                  <TableHead>Place</TableHead>
-                  <TableHead>Installer</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sampleApplications.map((application) => (
-                  <TableRow key={application.id}>
-                    <TableCell className="font-medium">
-                      {application.id}
-                    </TableCell>
-                    <TableCell>
-                      {getSystemTypeLabel(application.systemType)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(application.status)}
-                    </TableCell>
-                    <TableCell>
-                      {application.submissionDate.toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{application.subscriber}</TableCell>
-                    <TableCell>{application.place}</TableCell>
-                    <TableCell>{application.installer}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <DataTable data={sampleApplications} />
       </div>
     </div>
   );
